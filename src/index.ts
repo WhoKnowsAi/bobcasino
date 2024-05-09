@@ -35,6 +35,9 @@ async function main() {
 client.on('message', async (channel, tags, message, self) => {
     // const addcom = '!commands add';
     // const delcom = '!commands delete';
+    if("custom-reward-id" in tags){
+        console.log(tags["custom-reward-id"]);
+    }
     const channelName = channel.replace('#', '');
     const modStatus: boolean = tags.mod || (tags.username === channelName);
     const msgUsername: string = tags.username || '';
@@ -63,6 +66,18 @@ client.on('message', async (channel, tags, message, self) => {
         const user = await User.findOne({ username: msgUsername });
         if (user) {
             client.say(channel, `${msgUsername} has ${user.points} points`);
+        }
+    }
+
+    // !leaderboard: check leaderboard
+    const leaderboardRegex = /^!leaderboard$/i;
+    if (chat.match(leaderboardRegex)) {
+        const users = await User.find().sort({ points: -1 }).limit(5);
+        if (users) {
+            for (let i = 0; i < users.length; i++) {
+                const message = `${i + 1}. ${users[i].username} - ${users[i].points} points`;
+                client.say(channel, message);
+            }
         }
     }
 

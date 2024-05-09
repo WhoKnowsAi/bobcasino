@@ -1,5 +1,6 @@
 import { User } from './database';
 
+
 //blackjack functions
 // Define a deck of cards
 const deck = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'].flatMap(card => Array(4).fill(card));
@@ -14,22 +15,31 @@ function drawCard() {
 export function calculateHand(hand: string[]) {
     let value = 0;
     let aces = 0;
+    let nonAceValue = 0;
 
     for (const card of hand) {
         if (card === 'A') {
-            value += 11;
             aces += 1;
         } else if (['K', 'Q', 'J'].includes(card)) {
-            value += 10;
+            nonAceValue += 10;
         } else {
-            value += Number(card);
+            nonAceValue += Number(card);
         }
     }
 
-    // Adjust the value if there's a single ace and the total value exceeds 21
-    if (aces >= 1 && value > 21 && hand.includes('A')) {
-        value -= 10 * aces;
+    // Calculate the value of a hand without aces
+    let handValue = nonAceValue;
+
+    // Calculate the value of a hand with aces
+    for (let i = 0; i < aces; i++) {
+        if (handValue + 11 <= 21) {
+            handValue += 11;
+        } else {
+            handValue += 1;
+        }
     }
+
+    value = handValue; // Assign the calculated hand value to the 'value' variable
 
     return value;
 }
