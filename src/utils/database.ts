@@ -17,9 +17,15 @@ const CommandSchema = new mongoose.Schema({
     output: String
 });
 
+//Define the Mine schema
+const MineSchema = new mongoose.Schema({
+    mine: String,
+});
+
 // Create models from the schemas
 export const User = mongoose.model('User', UserSchema);
 export const Command = mongoose.model('Command', CommandSchema);
+export const Mine = mongoose.model('Mine', MineSchema);
 
 // Function to add a user
 export async function addUser(username: string, points: number, bet: number, insurance: boolean, blackjackHand: string[] | null, dealerHand: string[] | null, emojiCollection: string[] | null) {
@@ -41,4 +47,15 @@ export async function deleteCommand(command: string) {
 // Function to edit a command
 export async function editCommand(command: string, newOutput: string) {
     return Command.updateOne({ command }, { output: newOutput });
+}
+
+// Function to add a mine
+export async function addMine(mine: string) {
+    const m = new Mine({ mine });
+    await m.save();
+}
+
+// Function to delete a mine
+export async function deleteMine(mine: string) {
+    return Mine.deleteOne({ mine });
 }

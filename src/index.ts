@@ -6,7 +6,7 @@
 
 import { config } from 'dotenv';
 import * as tmi from 'tmi.js';
-import { addUser, User, addCommand, deleteCommand, editCommand, Command } from './utils/database';
+import { User, Command, Mine, addUser, addCommand, deleteCommand, editCommand, addMine, deleteMine } from './utils/database';
 import { blackjack, hit, stand, doubleDown, calculateHand } from './utils/casino';
 import { Emoji } from './utils/emoji';
 
@@ -48,14 +48,14 @@ const emojis = [
     new Emoji('🐸', 'frog', 10000),
     new Emoji('🐶', 'dog', 20000),
     new Emoji('🐱', 'cat', 20000),
-    new Emoji('💰','moneybag', 50000),
+    new Emoji('💰', 'moneybag', 50000),
     new Emoji('💎', 'diamond', 100000),
     new Emoji('🏎️', 'car', 500000),
     new Emoji('🚁', 'helicopter', 1000000),
     new Emoji('👑', 'crown', 10000000),
     new Emoji('🚀', 'rocket', 100000000),
 
-    
+
     // Add more emojis here
 ];
 
@@ -126,35 +126,12 @@ client.on('message', async (channel, tags, message, self) => {
         }
     }
 
-    // !gamble [points]: simple gamble points
-    const gambleRegex = /^!gamble (\d+|all)$/i;
-    const gambleMatch = chat.match(gambleRegex);
-    if (gambleMatch) {
+    // channel points redeem - 10k voucher
+    if(tags["custom-reward-id"] === "961a64c7-8d29-4910-8fbe-5ce66dc13b4c") {
         const user = await User.findOne({ username: msgUsername });
-        let bet: number;
-
-        if (gambleMatch[1].toLowerCase() === 'all') {
-            if (!user) {
-                client.say(channel, 'Invalid bet');
-                return;
-            }
-            bet = user.points;
-        } else {
-            bet = parseInt(gambleMatch[1]);
-        }
-
-        if (!user || bet < 1 || bet > user.points) {
-            client.say(channel, 'Invalid bet');
-            return;
-        } else {
-            const random = Math.floor(Math.random() * 100) + 1;
-            if (random < 50) {
-                user.points -= bet;
-                client.say(channel, `${msgUsername} rolled a ${random}. ${msgUsername} now has ${user.points} points :(`);
-            } else {
-                user.points += bet;
-                client.say(channel, `${msgUsername} rolled a ${random}. ${msgUsername} now has ${user.points} points :)`);
-            }
+        if(user){
+            user.points += 10000;
+            client.say(channel, `${msgUsername} redeemed 10k points!`);
             await user.save();
         }
     }
@@ -167,12 +144,16 @@ client.on('message', async (channel, tags, message, self) => {
         const emojiInput = buyEmojiMatch[1];
         const emoji = emojis.find(e => e.character === emojiInput || e.alias === emojiInput);
         if (!emoji) {
-            client.say(channel, 'Invalid emoji');
+            client.say(channel, 'Invalid item');
             return;
         }
         const user = await User.findOne({ username: msgUsername });
-        if (!user || user.points < emoji.price) {
-            client.say(channel, 'Not enough points');
+        if (!user) {
+            client.say(channel, 'User does not exist');
+            return;
+        }
+        if (user.points < emoji.price) {
+            client.say(channel, `You need ${emoji.price - user.points} more points to buy ${emoji.character}`);
             return;
         }
         user.points -= emoji.price;
@@ -216,6 +197,69 @@ client.on('message', async (channel, tags, message, self) => {
     //         await user.save();
     //     }
     // }
+
+    // !gamble [points]: simple gamble points
+    const gambleRegex = /^!gamble (\d+|all)$/i;
+    const gambleMatch = chat.match(gambleRegex);
+    if (gambleMatch) {
+        const user = await User.findOne({ username: msgUsername });
+        let bet: number;
+
+        if (gambleMatch[1].toLowerCase() === 'all') {
+            if (!user) {
+                client.say(channel, 'Invalid bet');
+                return;
+            }
+            bet = user.points;
+        } else {
+            bet = parseInt(gambleMatch[1]);
+        }
+
+        if (!user || bet < 1 || bet > user.points) {
+            client.say(channel, 'Invalid bet');
+            return;
+        } else {
+            const random = Math.floor(Math.random() * 100) + 1;
+            if (random < 50) {
+                user.points -= bet;
+                client.say(channel, `${msgUsername} rolled a ${random}. ${msgUsername} now has ${user.points} points :(`);
+            } else {
+                user.points += bet;
+                client.say(channel, `${msgUsername} rolled a ${random}. ${msgUsername} now has ${user.points} points :)`);
+            }
+            await user.save();
+        }
+    }
+
+    // !lottery: buy a lottery ticket for 100 points, user picks a number between 1-1000, winning number wins 100000 points
+    const lotteryRegex = /^!lottery (\d+)$/i;
+    const lotteryMatch = chat.match(lotteryRegex);
+    if (lotteryMatch) {
+        const user = await User.findOne({ username: msgUsername });
+        const number = parseInt(lotteryMatch[1]);
+        if (!user) {
+            client.say(channel, 'User does not exist');
+            return;
+        }
+        if (user.points < 100) {
+            client.say(channel, 'Insufficient points to buy a lottery ticket');
+            return;
+        }
+        if (number < 1 || number > 1000) {
+            client.say(channel, 'Invalid number');
+            return;
+        }
+        user.points -= 100;
+        const winningNumber = Math.floor(Math.random() * 1000) + 1;
+        if (number === winningNumber) {
+            user.points += 100000;
+            client.say(channel, `Congratulations! ${msgUsername} won the lottery! The winning number was ${winningNumber}. ${msgUsername} now has ${user.points} points`);
+        } else {
+            client.say(channel, `Better luck next time! The winning number was ${winningNumber}. ${msgUsername} now has ${user.points} points`);
+        }
+        await user.save();
+    }
+    
 
     //blackjack section
     const blackjackRegex = /^!blackjack (\d+|all)$/i;
@@ -367,6 +411,65 @@ client.on('message', async (channel, tags, message, self) => {
             client.say(channel, 'You are not currently playing blackjack.');
         }
     }
+
+    // // mine section - CURRENTLY BROKEN
+    // // mine points redeem handler
+    // if(tags["custom-reward-id"] === "e7179d56-57d4-47c0-9bc1-53777f5afd09") {
+    // addMine(chat);
+    // client.say(channel, `${msgUsername} planted a mine!`);
+    // } 
+    
+    // // message mine handler
+    // try {
+    //     const mineTest = await Mine.findOne({ mine: chat });
+    //     if(mineTest){
+    //         client.timeout(channel, msgUsername, 180, 'You hit a mine! RIP')
+    //         .then((data) => {
+    //             console.log(data);
+    //         })
+    //         .catch(error => {
+    //             console.error('Error timing out user:', error);
+    //             console.log('User:', msgUsername);
+    //         });
+    //         await deleteMine(chat);
+    //     }
+    // } catch (error) {
+    //     console.error('Error handling mine:', error);
+    // }
+
+    // // !addmine: add mine - MOD ONLY
+    // const addMineRegex = /^!addmine (\S+)$/i;
+    // const addMineMatch = chat.match(addMineRegex);
+    // if (addMineMatch && modStatus) {
+    //     const mine = addMineMatch[1];
+    //     const mineExists = await Mine.findOne({ mine });
+    //     if (mineExists) {
+    //         client.say(channel, `Mine ${mine} already exists`);
+    //         console.log(`Mine ${mine} already exists`);
+    //     } else {
+    //         addMine(mine)
+    //             .catch(err => console.error('Error adding mine:', err));
+    //         client.say(channel, `Mine ${mine} added`);
+    //         console.log(`Mine ${mine} added`);
+    //     }
+    // }
+
+
+    // // !removemine: remove mine - MOD ONLY
+    // const removeMineRegex = /^!removemine (\S+)$/i;
+    // const removeMineMatch = chat.match(removeMineRegex);
+    // if (removeMineMatch && modStatus) {
+    //     const mine = removeMineMatch[1];
+    //     const mineExists = await Mine.findOne({ mine });
+    //     if (mineExists) {
+    //         deleteMine(mine)
+    //             .catch(err => console.error('Error deleting mine:', err));
+    //         client.say(channel, `Mine ${mine} deleted`);
+    //         console.log(`Mine ${mine} deleted`);
+    //     } else {
+    //         client.say(channel, `Mine ${mine} does not exist`);
+    //     }
+    // }
 
     // text command section
     // !commands add/!addcom: add text command - MOD ONLY
