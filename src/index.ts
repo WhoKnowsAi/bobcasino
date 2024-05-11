@@ -15,7 +15,7 @@ config();
 
 const opts = {
     identity: {
-        username: process.env.USER1 || 'zodgy',
+        username: process.env.USER1 || 'chatbot',
         password: process.env.OAUTH1 || 'oauth:1234567890'
     },
     channels: process.env.CHANNELS?.split(',')
@@ -25,7 +25,6 @@ const client = new tmi.client(opts);
 
 client.connect();
 client.on('connected', () => {
-    // client.say('zodgy', 'connected');
     console.log('Connected to Twitch');
     // console.log(opts.identity.username);
 });
