@@ -7,7 +7,8 @@ const UserSchema = new mongoose.Schema({
     bet: { type: Number, default: 0 },
     insurance: { type: Boolean, default: false },
     blackjackHand: { type: [String], default: [] },
-    dealerHand: { type: [String], default: [] }
+    dealerHand: { type: [String], default: [] },
+    emojiCollection: { type: [String], default: []}
   });
 
 // Define the Command schema
@@ -21,8 +22,8 @@ export const User = mongoose.model('User', UserSchema);
 export const Command = mongoose.model('Command', CommandSchema);
 
 // Function to add a user
-export async function addUser(username: string, points: number, bet: number, insurance: boolean, blackjackHand: string[] | null, dealerHand: string[] | null) {
-    const user = new User({ username, points, bet, insurance, blackjackHand, dealerHand});
+export async function addUser(username: string, points: number, bet: number, insurance: boolean, blackjackHand: string[] | null, dealerHand: string[] | null, emojiCollection: string[] | null) {
+    const user = new User({ username, points, bet, insurance, blackjackHand, dealerHand, emojiCollection});
     await user.save();
 }
 

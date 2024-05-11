@@ -1,10 +1,17 @@
+// TODO:
+// more features - slots, roulette (maybe), emoji collection
+// remove some console.logs
+// 
+
+
 import { config } from 'dotenv';
 import * as tmi from 'tmi.js';
 import { addUser, User, addCommand, deleteCommand, editCommand, Command } from './utils/database';
 import { blackjack, hit, stand, doubleDown, calculateHand } from './utils/casino';
-
+import { Emoji } from './utils/emoji';
 
 config();
+
 
 const opts = {
     identity: {
@@ -18,11 +25,12 @@ const client = new tmi.client(opts);
 
 client.connect();
 client.on('connected', () => {
-    client.say('zodgy', 'connected');
+    // client.say('zodgy', 'connected');
     console.log('Connected to Twitch');
-    console.log(opts.identity.username);
+    // console.log(opts.identity.username);
 });
 
+// Connect to MongoDB
 const mongoose = require('mongoose');
 
 main().catch(err => console.log(err));
@@ -32,10 +40,30 @@ async function main() {
     console.log('Connected to MongoDB');
 }
 
+// Define bot-specific variables
+const emojis = [
+    new Emoji('🗑️', 'trash', 100),
+    new Emoji('🍔', 'burger', 2000),
+    new Emoji('🍕', 'pizza', 2000),
+    new Emoji('🍌', 'banana', 5000),
+    new Emoji('🐸', 'frog', 10000),
+    new Emoji('🐶', 'dog', 20000),
+    new Emoji('🐱', 'cat', 20000),
+    new Emoji('💰','moneybag', 50000),
+    new Emoji('💎', 'diamond', 100000),
+    new Emoji('🏎️', 'car', 500000),
+    new Emoji('🚁', 'helicopter', 1000000),
+    new Emoji('👑', 'crown', 10000000),
+    new Emoji('🚀', 'rocket', 100000000),
+
+    
+    // Add more emojis here
+];
+
 client.on('message', async (channel, tags, message, self) => {
     // const addcom = '!commands add';
     // const delcom = '!commands delete';
-    if("custom-reward-id" in tags){
+    if ("custom-reward-id" in tags) {
         console.log(tags["custom-reward-id"]);
     }
     const channelName = channel.replace('#', '');
@@ -45,13 +73,15 @@ client.on('message', async (channel, tags, message, self) => {
 
     const user = await User.findOne({ username: msgUsername });
     if (!user) {
-        addUser(msgUsername, 100, 0, false, [], [])
+        addUser(msgUsername, 10000, 0, false, [], [], []) // add user with 10000 points
             .catch(err => console.error('Error adding user:', err));
     }
 
-    const addCommandRegex = /^!(commands add|addcom) (\S+) (.+)$/i;
-    const editCommandRegex = /^!(commands edit|editcom) (\S+) (.+)$/i;
-    const deleteCommandRegex = /^!(commands delete|delcom) (\S+)/i;
+    // if user exists, give them a point per message
+    if (user) {
+        user.points += 1;
+        await user.save();
+    }
 
     let chat = message.trim();
     while (chat.substring(chat.length - 2) === '󠀀') { // trim invisible character from 7tv (so annoying, there is probably a more efficient way to do this)
@@ -121,27 +151,72 @@ client.on('message', async (channel, tags, message, self) => {
             const random = Math.floor(Math.random() * 100) + 1;
             if (random < 50) {
                 user.points -= bet;
-                client.say(channel, `${msgUsername} rolled a ${random}. ${msgUsername} now has ${user.points} points!`);
+                client.say(channel, `${msgUsername} rolled a ${random}. ${msgUsername} now has ${user.points} points :(`);
             } else {
                 user.points += bet;
-                client.say(channel, `${msgUsername} rolled a ${random}. ${msgUsername} now has ${user.points} points!`);
+                client.say(channel, `${msgUsername} rolled a ${random}. ${msgUsername} now has ${user.points} points :)`);
             }
             await user.save();
         }
     }
 
-    //!beg: beg for points
-    const begRegex = /^!beg$/i;
-    if (chat.match(begRegex)) {
+    //collection section
+    // !buy [emoji]: buy emoji
+    const buyEmojiRegex = /^!buy (\S+)$/i;
+    const buyEmojiMatch = chat.match(buyEmojiRegex);
+    if (buyEmojiMatch) {
+        const emojiInput = buyEmojiMatch[1];
+        const emoji = emojis.find(e => e.character === emojiInput || e.alias === emojiInput);
+        if (!emoji) {
+            client.say(channel, 'Invalid emoji');
+            return;
+        }
+        const user = await User.findOne({ username: msgUsername });
+        if (!user || user.points < emoji.price) {
+            client.say(channel, 'Not enough points');
+            return;
+        }
+        user.points -= emoji.price;
+        user.emojiCollection.push(emoji.character);
+        await user.save();
+        client.say(channel, `${msgUsername} bought an emoji: ${emoji.character}`);
+    }
+    // !collection: check emoji collection
+    const collectionRegex = /^!collection$/i;
+    if (chat.match(collectionRegex)) {
         const user = await User.findOne({ username: msgUsername });
         if (user) {
-            //random roll to get 1-5 points
-            const random = Math.floor(Math.random() * 5) + 1;
-            user.points += random;
-            client.say(channel, `After a long day of begging, ${msgUsername} received ${random} points!`);
-            await user.save();
+            const message = user.emojiCollection.length > 0 ? `${msgUsername}'s collection: ${user.emojiCollection.join(' , ')}` : `${msgUsername} has nothing but dust in their collection :(`;
+            client.say(channel, message);
         }
     }
+
+    // !store: check available emojis in store
+    const storeRegex = /^!store$/i;
+    if (chat.match(storeRegex)) {
+        let message = 'Available to buy: ';
+        emojis.forEach((emoji, index) => {
+            message += `${emoji.character} (${emoji.price})`;
+            if (index !== emojis.length - 1) {
+                message += ', ';
+            }
+        });
+        client.say(channel, message);
+    }
+
+
+    // //!beg: beg for points - REMOVED, REPLACING WITH PER-MESSAGE POINTS
+    // const begRegex = /^!beg$/i;
+    // if (chat.match(begRegex)) {
+    //     const user = await User.findOne({ username: msgUsername });
+    //     if (user) {
+    //         //random roll to get 1-5 points
+    //         const random = Math.floor(Math.random() * 5) + 1;
+    //         user.points += random;
+    //         client.say(channel, `After a long day of begging, ${msgUsername} received ${random} points!`);
+    //         await user.save();
+    //     }
+    // }
 
     //blackjack section
     const blackjackRegex = /^!blackjack (\d+|all)$/i;
@@ -182,7 +257,7 @@ client.on('message', async (channel, tags, message, self) => {
                 const dealerHandValue = calculateHand(updatedUser.dealerHand);
                 if (userHandValue === 21 && dealerHandValue !== 21) {
                     client.say(channel, `Blackjack! You win 1.5 times your bet! Your hand: ${userHandValue} (${updatedUser.blackjackHand.join(', ')}), Dealer's hand: ${dealerHandValue} (${updatedUser.dealerHand.join(', ')})`);
-                    updatedUser.points += Math.round(bet * 1.5);
+                    updatedUser.points += bet + Math.round(bet * 1.5);
                     updatedUser.blackjackHand = [];
                     updatedUser.dealerHand = [];
                     updatedUser.bet = 0;
@@ -263,7 +338,6 @@ client.on('message', async (channel, tags, message, self) => {
         }
     }
 
-
     // !stand: stand in blackjack
     const standMatch = chat.match(standRegex);
     if (standMatch) {
@@ -297,6 +371,7 @@ client.on('message', async (channel, tags, message, self) => {
 
     // text command section
     // !commands add/!addcom: add text command - MOD ONLY
+    const addCommandRegex = /^!(commands add|addcom) (\S+) (.+)$/i;
     const addCommandMatch = chat.match(addCommandRegex);
     if (addCommandMatch && modStatus) {
         const commandName = addCommandMatch[2];
@@ -314,6 +389,7 @@ client.on('message', async (channel, tags, message, self) => {
     }
 
     // !commands edit/!editcom: edit text command - MOD ONLY
+    const editCommandRegex = /^!(commands edit|editcom) (\S+) (.+)$/i;
     const editCommandMatch = chat.match(editCommandRegex);
     if (editCommandMatch && modStatus) {
 
@@ -332,6 +408,7 @@ client.on('message', async (channel, tags, message, self) => {
     }
 
     // !commands delete/!delcom: delete text command - MOD ONLY
+    const deleteCommandRegex = /^!(commands delete|delcom) (\S+)/i;
     const deleteCommandMatch = chat.match(deleteCommandRegex);
     if (deleteCommandMatch && modStatus) {
 
@@ -347,8 +424,6 @@ client.on('message', async (channel, tags, message, self) => {
             client.say(channel, `Command ${commandName} does not exist`);
         }
     }
-
-
 
     // text command handler
     if (!chat.startsWith('!commands')) {

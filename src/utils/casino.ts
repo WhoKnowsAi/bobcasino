@@ -1,9 +1,10 @@
 import { User } from './database';
 
-
-//blackjack functions
 // Define a deck of cards
-const deck = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'].flatMap(card => Array(4).fill(card));
+let deck = ['A♠', '2♠', '3♠', '4♠', '5♠', '6♠', '7♠', '8♠', '9♠', '10♠', 'J♠', 'Q♠', 'K♠',
+            'A♣', '2♣', '3♣', '4♣', '5♣', '6♣', '7♣', '8♣', '9♣', '10♣', 'J♣', 'Q♣', 'K♣',
+            'A♥', '2♥', '3♥', '4♥', '5♥', '6♥', '7♥', '8♥', '9♥', '10♥', 'J♥', 'Q♥', 'K♥',
+            'A♦', '2♦', '3♦', '4♦', '5♦', '6♦', '7♦', '8♦', '9♦', '10♦', 'J♦', 'Q♦', 'K♦'];
 
 // Function to draw a card from the deck
 function drawCard() {
@@ -18,19 +19,20 @@ export function calculateHand(hand: string[]) {
     let nonAceValue = 0;
 
     for (const card of hand) {
-        if (card === 'A') {
+        const rank = card.slice(0, -1); // Extract the rank from the card
+        if (rank === 'A') {
             aces += 1;
-        } else if (['K', 'Q', 'J'].includes(card)) {
+        } else if (['K', 'Q', 'J'].includes(rank)) {
             nonAceValue += 10;
         } else {
-            nonAceValue += Number(card);
+            nonAceValue += Number(rank);
         }
     }
 
     // Calculate the value of a hand without aces
     let handValue = nonAceValue;
 
-    // Calculate the value of a hand with aces
+    // Caclulate the value of a hand with aces
     for (let i = 0; i < aces; i++) {
         if (handValue + 11 <= 21) {
             handValue += 11;
@@ -39,13 +41,17 @@ export function calculateHand(hand: string[]) {
         }
     }
 
-    value = handValue; // Assign the calculated hand value to the 'value' variable
+    value = handValue; // Assign the calculated hand value to the value variable
 
     return value;
 }
 
 export async function blackjack(username: string, bet: number) {
-    console.log('blackjack function called');
+    console.log('blackjack function called, resetting deck and drawing cards');
+    deck = ['A♠', '2♠', '3♠', '4♠', '5♠', '6♠', '7♠', '8♠', '9♠', '10♠', 'J♠', 'Q♠', 'K♠',
+            'A♣', '2♣', '3♣', '4♣', '5♣', '6♣', '7♣', '8♣', '9♣', '10♣', 'J♣', 'Q♣', 'K♣',
+            'A♥', '2♥', '3♥', '4♥', '5♥', '6♥', '7♥', '8♥', '9♥', '10♥', 'J♥', 'Q♥', 'K♥',
+            'A♦', '2♦', '3♦', '4♦', '5♦', '6♦', '7♦', '8♦', '9♦', '10♦', 'J♦', 'Q♦', 'K♦'];
     const user = await User.findOne({ username });
 
     // Check if user exists, if user.points is defined and is enough for the bet, and if user.blackjackHand is not null
