@@ -58,7 +58,7 @@ export async function blackjack(username: string, bet: number) {
     if (user && user.points && user.points >= bet) {
         console.log('user exists and has enough points');
         user.points -= bet;
-        user.bet = bet;
+        user.blackjackBet = bet;
         user.blackjackHand = [drawCard(), drawCard()];
         user.dealerHand = [drawCard()]; // Initialize dealerHand
         await user.save();
@@ -110,9 +110,9 @@ export async function doubleDown(username: string) {
         dealerHandValue = dealerValue;
         
     }
-    if (user && user.blackjackHand.length > 0 && user.points >= user.bet) {
-        user.points -= user.bet;
-        user.bet *= 2;
+    if (user && user.blackjackHand.length > 0 && user.points >= user.blackjackBet) {
+        user.points -= user.blackjackBet;
+        user.blackjackBet *= 2;
         await user.save();
     }
     return { userHandValue, dealerHandValue };
@@ -121,8 +121,8 @@ export async function doubleDown(username: string) {
 export async function insurance(username: string) {
     const user = await User.findOne({ username });
 
-    if (user && user.blackjackHand.length > 0 && user.points >= user.bet / 2) {
-        user.points -= user.bet / 2;
+    if (user && user.blackjackHand.length > 0 && user.points >= user.blackjackBet / 2) {
+        user.points -= user.blackjackBet / 2;
         user.insurance = true;
         await user.save();
     }

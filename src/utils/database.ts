@@ -4,7 +4,11 @@ import mongoose from 'mongoose';
 const UserSchema = new mongoose.Schema({
     username: String,
     points: { type: Number, default: 100 },
-    bet: { type: Number, default: 0 },
+    blackjackBet: { type: Number, default: 0 },
+    isDueling: { type: Boolean, default: false },
+    duelInitiator: { type: Boolean, default: false },
+    duelOpponent: { type: String, default: '' },
+    duelBet: { type: Number, default: 0 },
     insurance: { type: Boolean, default: false },
     blackjackHand: { type: [String], default: [] },
     dealerHand: { type: [String], default: [] },
@@ -28,8 +32,8 @@ export const Command = mongoose.model('Command', CommandSchema);
 export const Mine = mongoose.model('Mine', MineSchema);
 
 // Function to add a user
-export async function addUser(username: string, points: number, bet: number, insurance: boolean, blackjackHand: string[] | null, dealerHand: string[] | null, emojiCollection: string[] | null) {
-    const user = new User({ username, points, bet, insurance, blackjackHand, dealerHand, emojiCollection});
+export async function addUser(username: string, points: number, blackjackBet: number, isDueling: boolean, duelInitiator: boolean, duelOpponent: string, duelBet: number, insurance: boolean, blackjackHand: string[] | null, dealerHand: string[] | null, emojiCollection: string[] | null) {
+    const user = new User({ username, points, blackjackBet, isDueling, duelInitiator, duelOpponent, duelBet, insurance, blackjackHand, dealerHand, emojiCollection});
     await user.save();
 }
 

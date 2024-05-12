@@ -59,6 +59,8 @@ const emojis = [
     // Add more emojis here
 ];
 
+let lotteryAddition = 0;
+
 client.on('message', async (channel, tags, message, self) => {
     // const addcom = '!commands add';
     // const delcom = '!commands delete';
@@ -72,7 +74,7 @@ client.on('message', async (channel, tags, message, self) => {
 
     const user = await User.findOne({ username: msgUsername });
     if (!user) {
-        addUser(msgUsername, 10000, 0, false, [], [], []) // add user with 10000 points
+        addUser(msgUsername.toLowerCase(), 10000, 0, false, false, '', 0, false, [], [], []) // add user with 10000 points
             .catch(err => console.error('Error adding user:', err));
     }
 
@@ -87,6 +89,23 @@ client.on('message', async (channel, tags, message, self) => {
         chat = chat.substring(0, chat.length - 3);
     }
     console.log(tags.username + ': ' + chat + ' ' + tags.mod + ' ' + channelName);
+
+    // !adduser [username]: add user - MOD ONLY
+    const addUserRegex = /^!adduser (\S+)$/i;
+    const addUserMatch = chat.match(addUserRegex);
+    if (addUserMatch && modStatus) {
+        const username = addUserMatch[1];
+        const userExists = await User.findOne({ username: username });
+        if (userExists) {
+            client.say(channel, `User ${username} already exists`);
+            console.log(`User ${username} already exists`);
+        } else {
+            addUser(username, 10000, 0, false, false, '', 0, false, [], [], [])
+                .catch(err => console.error('Error adding user:', err));
+            client.say(channel, `User ${username} added`);
+            console.log(`User ${username} added`);
+        }
+    }
 
     //points section
     // !points: check points
@@ -107,6 +126,119 @@ client.on('message', async (channel, tags, message, self) => {
                 const message = `${i + 1}. ${users[i].username} - ${users[i].points} points`;
                 client.say(channel, message);
             }
+        }
+    }
+
+    // !donate [username] [points]: donate points to another user
+    const donateRegex = /^!donate (\S+) (\d+)$/i;
+    const donateMatch = chat.match(donateRegex);
+    if (donateMatch) {
+        const recipient = donateMatch[1];
+        const points = parseInt(donateMatch[2]);
+        const user = await User.findOne({ username: msgUsername });
+        const recipientUser = await User.findOne({ username: recipient });
+        if (user && recipientUser) {
+            if (points < 1 || points > user.points) {
+                client.say(channel, 'Invalid donation amount');
+                return;
+            }
+            user.points -= points;
+            recipientUser.points += points;
+            await user.save();
+            await recipientUser.save();
+            client.say(channel, `${msgUsername} donated ${points} points to ${recipient}`);
+        }
+    }
+
+    // !duel [username] [points]: duel another user, winner receives points
+    const duelRegex = /^!duel (\S+) (\d+)$/i;
+    const duelMatch = chat.match(duelRegex);
+    if (duelMatch) {
+        const opponent = duelMatch[1].toLowerCase();
+        const points = parseInt(duelMatch[2]);
+        const user = await User.findOne({ username: msgUsername });
+        const opponentUser = await User.findOne({ username: opponent });
+        if (user && opponentUser) {
+            if (points < 1 || points > user.points || points > opponentUser.points) {
+                client.say(channel, 'Invalid duel amount');
+                return;
+            }
+            if(user.isDueling){
+                client.say(channel, `You are already in a duel with ${user.duelOpponent}`);
+                return;
+            }
+            if(opponentUser.isDueling){
+                client.say(channel, `${opponent} is already in a duel with ${opponentUser.duelOpponent}`);
+                return;
+            }
+            user.points -= points;
+            user.duelBet = points;
+            opponentUser.points -= points;
+            opponentUser.duelBet = points;
+            user.isDueling = true;
+            opponentUser.isDueling = true;
+            user.duelInitiator = true;
+            user.duelOpponent = opponent;
+            opponentUser.duelOpponent = msgUsername;
+            await user.save();
+            await opponentUser.save();
+            client.say(channel, `${msgUsername} has challenged ${opponent} to a duel for ${points} points! Type !accept or !decline to respond.`);
+        }
+    }
+
+    // !accept: accept a duel
+    const acceptRegex = /^!accept$/i;
+    if (chat.match(acceptRegex)) {
+        const user = await User.findOne({ username: msgUsername });
+        const opponent = await User.findOne({ username: user?.duelOpponent });
+        if (user && opponent && user.isDueling && opponent.isDueling && user.duelOpponent === opponent.username) {
+            // check if user is the duel initiator, if so, they can't accept
+            if (user.duelInitiator) {
+                client.say(channel, `${msgUsername}, you can't accept a duel you initiated!`);
+                return;
+            }
+
+            const random = Math.floor((Math.random() * 100) + 1);
+            if (random > 50) {
+                user.points += 2 * user.duelBet;
+                client.say(channel, `${msgUsername} won the duel! ${msgUsername} now has ${user.points} points`);
+            } else {
+                opponent.points += 2 * opponent.duelBet;
+                client.say(channel, `${user.duelOpponent} won the duel! ${user.duelOpponent} now has ${opponent.points} points`);
+            }
+
+            user.isDueling = false;
+            opponent.isDueling = false;
+            user.duelInitiator = false;
+            opponent.duelInitiator = false;
+            user.duelOpponent = '';
+            opponent.duelOpponent = '';
+            user.duelBet = 0;
+            opponent.duelBet = 0;
+            await user.save();
+            await opponent.save();
+        }
+    }
+
+    // !decline: decline a duel
+    const declineRegex = /^!decline$/i;
+    if (chat.match(declineRegex)) {
+        const user = await User.findOne({ username: msgUsername });
+        const opponent = await User.findOne({ username: user?.duelOpponent });
+        if (user && opponent && user.isDueling && opponent.isDueling && user.duelOpponent === opponent.username) {
+            client.say(channel, `${msgUsername} declined the duel. maybe next time :(`);
+            user.isDueling = false;
+            opponent.isDueling = false;
+            user.duelInitiator = false;
+            opponent.duelInitiator = false;
+            user.duelOpponent = '';
+            opponent.duelOpponent = '';
+            user.points += user.duelBet;
+            opponent.points += opponent.duelBet;
+            user.duelBet = 0;
+            opponent.duelBet = 0;
+            await user.save();
+            await opponent.save();
         }
     }
 
@@ -231,7 +363,8 @@ client.on('message', async (channel, tags, message, self) => {
         }
     }
 
-    // !lottery: buy a lottery ticket for 100 points, user picks a number between 1-1000, winning number wins 100000 points
+    // !lottery: buy a lottery ticket for 100 points, user picks a number between 1-1000, winning number wins 100000 + (number of losing tickets * 100) points
+
     const lotteryRegex = /^!lottery (\d+)$/i;
     const lotteryMatch = chat.match(lotteryRegex);
     if (lotteryMatch) {
@@ -251,11 +384,14 @@ client.on('message', async (channel, tags, message, self) => {
         }
         user.points -= 100;
         const winningNumber = Math.floor(Math.random() * 1000) + 1;
+        // const winningNumber = 777; // for testing purposes
         if (number === winningNumber) {
-            user.points += 100000;
+            user.points += 100000 + lotteryAddition;
             client.say(channel, `Congratulations! ${msgUsername} won the lottery! The winning number was ${winningNumber}. ${msgUsername} now has ${user.points} points`);
+            lotteryAddition = 0;
         } else {
-            client.say(channel, `Better luck next time! The winning number was ${winningNumber}. ${msgUsername} now has ${user.points} points`);
+            lotteryAddition += 100;
+            client.say(channel, `Better luck next time! The winning number was ${winningNumber}. The jackpot is now ${100000 + lotteryAddition} points. ${msgUsername} now has ${user.points} points`);
         }
         await user.save();
     }
@@ -303,7 +439,7 @@ client.on('message', async (channel, tags, message, self) => {
                     updatedUser.points += bet + Math.round(bet * 1.5);
                     updatedUser.blackjackHand = [];
                     updatedUser.dealerHand = [];
-                    updatedUser.bet = 0;
+                    updatedUser.blackjackBet = 0;
                     await updatedUser.save();
                     // await stand(msgUsername);
                 } else if (userHandValue === 21 && dealerHandValue === 21) {
@@ -333,7 +469,7 @@ client.on('message', async (channel, tags, message, self) => {
                     // Handle bust logic here
                     updatedUser.blackjackHand = [];
                     updatedUser.dealerHand = [];
-                    updatedUser.bet = 0;
+                    updatedUser.blackjackBet = 0;
                     await updatedUser.save();
                 } else {
                     client.say(channel, `Your new hand: ${handValue} (${updatedUser.blackjackHand.join(', ')})`);
@@ -349,7 +485,7 @@ client.on('message', async (channel, tags, message, self) => {
     if (doubleDownMatch) {
         const user = await User.findOne({ username: msgUsername });
         if (user && user.blackjackHand && user.blackjackHand.length > 0) {
-            if (user.points < user.bet) {
+            if (user.points < user.blackjackBet) {
                 client.say(channel, 'Insufficient points to double down');
                 return;
             }
@@ -361,19 +497,19 @@ client.on('message', async (channel, tags, message, self) => {
                     client.say(channel, `Bust! Your final hand: ${userHandValue} (${updatedUser.blackjackHand.join(', ')})`);
                 } else if (dealerHandValue > 21) {
                     client.say(channel, `Dealer busts! You win! Your final hand: ${userHandValue} (${updatedUser.blackjackHand.join(', ')}), Dealer's final hand: ${dealerHandValue} (${updatedUser.dealerHand.join(', ')})`);
-                    updatedUser.points += updatedUser.bet * 2;
+                    updatedUser.points += updatedUser.blackjackBet * 2;
                 } else if (userHandValue > dealerHandValue) {
                     client.say(channel, `You win! Your final hand: ${userHandValue} (${updatedUser.blackjackHand.join(', ')}), Dealer's final hand: ${dealerHandValue} (${updatedUser.dealerHand.join(', ')})`);
-                    updatedUser.points += updatedUser.bet * 2;
+                    updatedUser.points += updatedUser.blackjackBet * 2;
                 } else if (userHandValue < dealerHandValue) {
                     client.say(channel, `You lose! Your final hand: ${userHandValue} (${updatedUser.blackjackHand.join(', ')}), Dealer's final hand: ${dealerHandValue} (${updatedUser.dealerHand.join(', ')})`);
                 } else {
                     client.say(channel, `It's a tie! Your final hand: ${userHandValue} (${updatedUser.blackjackHand.join(', ')}), Dealer's final hand: ${dealerHandValue} (${updatedUser.dealerHand.join(', ')})`);
-                    updatedUser.points += updatedUser.bet;
+                    updatedUser.points += updatedUser.blackjackBet;
                 }
                 updatedUser.blackjackHand = [];
                 updatedUser.dealerHand = [];
-                updatedUser.bet = 0;
+                updatedUser.blackjackBet = 0;
                 await updatedUser.save();
             }
         } else {
@@ -392,19 +528,19 @@ client.on('message', async (channel, tags, message, self) => {
             if (updatedUser) {
                 if (dealerHandValue > 21) {
                     client.say(channel, `Dealer busts! You win! Your final hand: ${userHandValue} (${updatedUser.blackjackHand.join(', ')}), Dealer's final hand: ${dealerHandValue} (${updatedUser.dealerHand.join(', ')})`);
-                    updatedUser.points += updatedUser.bet * 2;
+                    updatedUser.points += updatedUser.blackjackBet * 2;
                 } else if (userHandValue > dealerHandValue) {
                     client.say(channel, `You win! Your final hand: ${userHandValue} (${updatedUser.blackjackHand.join(', ')}), Dealer's final hand: ${dealerHandValue} (${updatedUser.dealerHand.join(', ')})`);
-                    updatedUser.points += updatedUser.bet * 2;
+                    updatedUser.points += updatedUser.blackjackBet * 2;
                 } else if (userHandValue < dealerHandValue) {
                     client.say(channel, `You lose! Your final hand: ${userHandValue} (${updatedUser.blackjackHand.join(', ')}), Dealer's final hand: ${dealerHandValue} (${updatedUser.dealerHand.join(', ')})`);
                 } else {
                     client.say(channel, `It's a tie! Your final hand: ${userHandValue} (${updatedUser.blackjackHand.join(', ')}), Dealer's final hand: ${dealerHandValue} (${updatedUser.dealerHand.join(', ')})`);
-                    updatedUser.points += updatedUser.bet;
+                    updatedUser.points += updatedUser.blackjackBet;
                 }
                 updatedUser.blackjackHand = [];
                 updatedUser.dealerHand = [];
-                updatedUser.bet = 0;
+                updatedUser.blackjackBet = 0;
                 await updatedUser.save();
             }
         } else {
