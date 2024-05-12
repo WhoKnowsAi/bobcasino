@@ -1,6 +1,6 @@
-# ZodBot Twitch
+# zodbot
 
-ZodBot is a Twitch bot built with Node.js and TypeScript. It uses the tmi.js library to interact with the Twitch chat and MongoDB for data persistence.
+zodbot is a Twitch bot built with Node.js and TypeScript. It uses the tmi.js library to interact with the Twitch chat and MongoDB for data persistence.
 
 ## Features
 
