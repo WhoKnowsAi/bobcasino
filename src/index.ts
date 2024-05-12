@@ -1,7 +1,11 @@
 // TODO:
-// more features - slots, roulette (maybe), emoji collection
+// more features - slots, roulette (maybe), emoji collection - DONE
 // remove some console.logs
-// 
+// move lotteryAddition to database
+// fix mine section
+// add more emojis
+// add more commands
+// update command handler to ignore already existing commands
 
 
 import { config } from 'dotenv';
@@ -259,7 +263,7 @@ client.on('message', async (channel, tags, message, self) => {
     }
 
     // channel points redeem - 10k voucher
-    if(tags["custom-reward-id"] === "961a64c7-8d29-4910-8fbe-5ce66dc13b4c") {
+    if(tags["custom-reward-id"] === "961a64c7-8d29-4910-8fbe-5ce66dc13b4c") { // change to your own channel points reward id
         const user = await User.findOne({ username: msgUsername });
         if(user){
             user.points += 10000;
@@ -363,7 +367,7 @@ client.on('message', async (channel, tags, message, self) => {
         }
     }
 
-    // !lottery: buy a lottery ticket for 100 points, user picks a number between 1-1000, winning number wins 100000 + (number of losing tickets * 100) points
+    // !lottery [number]: buy a lottery ticket for 100 points, user picks a number between 1-1000, winning number wins 100000 + (number of losing tickets * 100) points
 
     const lotteryRegex = /^!lottery (\d+)$/i;
     const lotteryMatch = chat.match(lotteryRegex);
