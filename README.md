@@ -40,30 +40,7 @@ ZodBot is a Twitch bot built with Node.js and TypeScript. It uses the tmi.js lib
 1. Clone the repository:
 
 ```sh
-git clone https://github.com/yourusername/zodbot-twitch.git
-cd zodbot-twitch
-```
-
-2. GitHub Copilot: Sure, here's a basic `README.md` for your project:
-
-```markdown
-# ZodBot Twitch
-
-ZodBot is a Twitch bot built with Node.js and TypeScript. It uses the tmi.js library to interact with the Twitch chat and MongoDB for data persistence.
-
-## Features
-
-- Points system: Users earn points by participating in the chat.
-- Dueling: Users can duel each other for points.
-- Donations: Users can donate points to each other.
-- Leaderboard: Displays the users with the most points.
-
-## Getting Started
-
-1. Clone the repository:
-
-```sh
-git clone https://github.com/yourusername/zodbot-twitch.git
+git clone https://github.com/cjenstad/zodbot-twitch.git
 cd zodbot-twitch
 ```
 
