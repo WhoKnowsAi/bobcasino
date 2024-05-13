@@ -1,21 +1,18 @@
 // TODO:
-// more features - slots, roulette (maybe), emoji collection - DONE
+// more features - slots, roulette (maybe), stock market
 // remove some console.logs
-// move lotteryAddition to database
 // fix mine section
 // add more emojis
 // add more commands
 // update command handler to ignore already existing commands
 
-
 import { config } from 'dotenv';
 import * as tmi from 'tmi.js';
-import { User, Command, Mine, addUser, addCommand, deleteCommand, editCommand, addMine, deleteMine } from './utils/database';
+import { User, Command, Mine, Lottery, addUser, addCommand, deleteCommand, editCommand, addMine, deleteMine, addLottery } from './utils/database';
 import { blackjack, hit, stand, doubleDown, calculateHand } from './utils/casino';
 import { Emoji } from './utils/emoji';
 
 config();
-
 
 const opts = {
     identity: {
@@ -45,25 +42,41 @@ async function main() {
 
 // Define bot-specific variables
 const emojis = [
+    new Emoji('🫓', 'flatbread', 10),
     new Emoji('🗑️', 'trash', 100),
+    new Emoji('🧅', 'onion', 200),
+    new Emoji('🍳', 'egg', 399),
+    new Emoji('🍩', 'donut', 1000),
     new Emoji('🍔', 'burger', 2000),
     new Emoji('🍕', 'pizza', 2000),
+    new Emoji('🍨', 'icecream', 2000),
+    new Emoji('🍟', 'fries', 2000),
     new Emoji('🍌', 'banana', 5000),
+    new Emoji('🪃', 'boomerang', 5000),
+    new Emoji('🙈', 'seenoevil', 5000),
+    new Emoji('🙉', 'hearnoevil', 5000),
+    new Emoji('🙊', 'speaknoevil', 5000),
+    new Emoji('🦍', 'gorilla', 10000),
     new Emoji('🐸', 'frog', 10000),
+    new Emoji('🦘', 'kangaroo', 10000),
     new Emoji('🐶', 'dog', 20000),
     new Emoji('🐱', 'cat', 20000),
+    new Emoji('🦧', 'orangutan', 20000),
+    new Emoji('🐊', 'crocodile', 20000),
     new Emoji('💰', 'moneybag', 50000),
     new Emoji('💎', 'diamond', 100000),
+    new Emoji('🗿', 'moai', 200000),
     new Emoji('🏎️', 'car', 500000),
     new Emoji('🚁', 'helicopter', 1000000),
+    new Emoji('🪂', 'parachute', 1000000),
     new Emoji('👑', 'crown', 10000000),
     new Emoji('🚀', 'rocket', 100000000),
+    new Emoji('🛸', 'ufo', 200000000),
+    new Emoji('💦', 'sweat', 500000000)
 
 
     // Add more emojis here
 ];
-
-let lotteryAddition = 0;
 
 client.on('message', async (channel, tags, message, self) => {
     // const addcom = '!commands add';
@@ -82,6 +95,13 @@ client.on('message', async (channel, tags, message, self) => {
             .catch(err => console.error('Error adding user:', err));
     }
 
+    // if lottery doesn't exist, create it
+    const lottery = await Lottery.findOne();
+    if (!lottery) {
+        addLottery(0)
+            .catch(err => console.error('Error adding lottery:', err));
+    }
+
     // if user exists, give them a point per message
     if (user) {
         user.points += 1;
@@ -98,7 +118,7 @@ client.on('message', async (channel, tags, message, self) => {
     const addUserRegex = /^!adduser (\S+)$/i;
     const addUserMatch = chat.match(addUserRegex);
     if (addUserMatch && modStatus) {
-        const username = addUserMatch[1];
+        const username = addUserMatch[1].toLowerCase();
         const userExists = await User.findOne({ username: username });
         if (userExists) {
             client.say(channel, `User ${username} already exists`);
@@ -137,13 +157,17 @@ client.on('message', async (channel, tags, message, self) => {
     const donateRegex = /^!donate (\S+) (\d+)$/i;
     const donateMatch = chat.match(donateRegex);
     if (donateMatch) {
-        const recipient = donateMatch[1];
+        const recipient = donateMatch[1].toLowerCase();
         const points = parseInt(donateMatch[2]);
         const user = await User.findOne({ username: msgUsername });
         const recipientUser = await User.findOne({ username: recipient });
         if (user && recipientUser) {
             if (points < 1 || points > user.points) {
                 client.say(channel, 'Invalid donation amount');
+                return;
+            }
+            if (msgUsername.toLowerCase() === recipient.toLowerCase()) {
+                client.say(channel, "You can't donate points to yourself! scammer >:(");
                 return;
             }
             user.points -= points;
@@ -167,11 +191,11 @@ client.on('message', async (channel, tags, message, self) => {
                 client.say(channel, 'Invalid duel amount');
                 return;
             }
-            if(user.isDueling){
+            if (user.isDueling) {
                 client.say(channel, `You are already in a duel with ${user.duelOpponent}`);
                 return;
             }
-            if(opponentUser.isDueling){
+            if (opponentUser.isDueling) {
                 client.say(channel, `${opponent} is already in a duel with ${opponentUser.duelOpponent}`);
                 return;
             }
@@ -250,7 +274,7 @@ client.on('message', async (channel, tags, message, self) => {
     const setPointsRegex = /^!setpoints (\S+) (\d+)$/i;
     const setPointsMatch = chat.match(setPointsRegex);
     if (setPointsMatch && modStatus) {
-        const username = setPointsMatch[1];
+        const username = setPointsMatch[1].toLowerCase();
         const points = parseInt(setPointsMatch[2]);
         const user = await User.findOne({ username });
         if (user) {
@@ -263,9 +287,9 @@ client.on('message', async (channel, tags, message, self) => {
     }
 
     // channel points redeem - 10k voucher
-    if(tags["custom-reward-id"] === "961a64c7-8d29-4910-8fbe-5ce66dc13b4c") { // change to your own channel points reward id
+    if (tags["custom-reward-id"] === "961a64c7-8d29-4910-8fbe-5ce66dc13b4c") { // change to your own channel points reward id
         const user = await User.findOne({ username: msgUsername });
-        if(user){
+        if (user) {
             user.points += 10000;
             client.say(channel, `${msgUsername} redeemed 10k points!`);
             await user.save();
@@ -273,11 +297,36 @@ client.on('message', async (channel, tags, message, self) => {
     }
 
     //collection section
+
+    // !collection: check emoji collection
+    const collectionRegex = /^!collection$/i;
+    if (chat.match(collectionRegex)) {
+        const user = await User.findOne({ username: msgUsername });
+        if (user) {
+            const message = user.emojiCollection.length > 0 ? `${msgUsername}'s collection: ${user.emojiCollection.join(' , ')}` : `${msgUsername} has nothing but dust in their collection :(`;
+            client.say(channel, message);
+        }
+    }
+
+
+    // !store: check available emojis in store
+    const storeRegex = /^!(store|shop)$/i;
+    if (chat.match(storeRegex)) {
+        let message = 'Available to buy: ';
+        emojis.forEach((emoji, index) => {
+            message += `${emoji.character} (${emoji.price})`;
+            if (index !== emojis.length - 1) {
+                message += ', ';
+            }
+        });
+        client.say(channel, message);
+    }
+
     // !buy [emoji]: buy emoji
     const buyEmojiRegex = /^!buy (\S+)$/i;
     const buyEmojiMatch = chat.match(buyEmojiRegex);
     if (buyEmojiMatch) {
-        const emojiInput = buyEmojiMatch[1];
+        const emojiInput = buyEmojiMatch[1].toLowerCase();
         const emoji = emojis.find(e => e.character === emojiInput || e.alias === emojiInput);
         if (!emoji) {
             client.say(channel, 'Invalid item');
@@ -297,29 +346,32 @@ client.on('message', async (channel, tags, message, self) => {
         await user.save();
         client.say(channel, `${msgUsername} bought an emoji: ${emoji.character}`);
     }
-    // !collection: check emoji collection
-    const collectionRegex = /^!collection$/i;
-    if (chat.match(collectionRegex)) {
-        const user = await User.findOne({ username: msgUsername });
-        if (user) {
-            const message = user.emojiCollection.length > 0 ? `${msgUsername}'s collection: ${user.emojiCollection.join(' , ')}` : `${msgUsername} has nothing but dust in their collection :(`;
-            client.say(channel, message);
+
+    // !sell [emoji]: sell emoji
+    const sellEmojiRegex = /^!sell (\S+)$/i;
+    const sellEmojiMatch = chat.match(sellEmojiRegex);
+    if (sellEmojiMatch) {
+        const emojiInput = sellEmojiMatch[1].toLowerCase();
+        const emoji = emojis.find(e => e.character === emojiInput || e.alias === emojiInput);
+        if (!emoji) {
+            client.say(channel, 'Invalid item');
+            return;
         }
+        const user = await User.findOne({ username: msgUsername });
+        if (!user) {
+            client.say(channel, 'User does not exist');
+            return;
+        }
+        const emojiIndex = user.emojiCollection.indexOf(emoji.character);
+        if (emojiIndex === -1) {
+            client.say(channel, `You do not own ${emoji.character}`);
+            return;
+        }
+        user.points += emoji.price;
+        user.emojiCollection.splice(emojiIndex, 1);
+        await user.save();
+        client.say(channel, `${msgUsername} parted ways with ${emoji.character}`);
     }
-
-    // !store: check available emojis in store
-    const storeRegex = /^!store$/i;
-    if (chat.match(storeRegex)) {
-        let message = 'Available to buy: ';
-        emojis.forEach((emoji, index) => {
-            message += `${emoji.character} (${emoji.price})`;
-            if (index !== emojis.length - 1) {
-                message += ', ';
-            }
-        });
-        client.say(channel, message);
-    }
-
 
     // //!beg: beg for points - REMOVED, REPLACING WITH PER-MESSAGE POINTS
     // const begRegex = /^!beg$/i;
@@ -368,7 +420,6 @@ client.on('message', async (channel, tags, message, self) => {
     }
 
     // !lottery [number]: buy a lottery ticket for 100 points, user picks a number between 1-1000, winning number wins 100000 + (number of losing tickets * 100) points
-
     const lotteryRegex = /^!lottery (\d+)$/i;
     const lotteryMatch = chat.match(lotteryRegex);
     if (lotteryMatch) {
@@ -386,20 +437,28 @@ client.on('message', async (channel, tags, message, self) => {
             client.say(channel, 'Invalid number');
             return;
         }
+
         user.points -= 100;
         const winningNumber = Math.floor(Math.random() * 1000) + 1;
         // const winningNumber = 777; // for testing purposes
         if (number === winningNumber) {
-            user.points += 100000 + lotteryAddition;
+            user.points += 1000000 + (lottery && lottery.lotteryBonus || 0);
             client.say(channel, `Congratulations! ${msgUsername} won the lottery! The winning number was ${winningNumber}. ${msgUsername} now has ${user.points} points`);
-            lotteryAddition = 0;
+            if (lottery) {
+                lottery.lotteryBonus = 0;
+                await lottery.save();
+            }
         } else {
-            lotteryAddition += 100;
-            client.say(channel, `Better luck next time! The winning number was ${winningNumber}. The jackpot is now ${100000 + lotteryAddition} points. ${msgUsername} now has ${user.points} points`);
+            if (lottery) {
+                lottery.lotteryBonus = (lottery.lotteryBonus || 0) + 99;
+                await lottery.save();
+            }
+            client.say(channel, `Better luck next time! The winning number was ${winningNumber}. The jackpot is now ${1000000 + (lottery && lottery.lotteryBonus || 0)} points. ${msgUsername} now has ${user.points} points`);
         }
         await user.save();
+
     }
-    
+
 
     //blackjack section
     const blackjackRegex = /^!blackjack (\d+|all)$/i;
@@ -558,7 +617,7 @@ client.on('message', async (channel, tags, message, self) => {
     // addMine(chat);
     // client.say(channel, `${msgUsername} planted a mine!`);
     // } 
-    
+
     // // message mine handler
     // try {
     //     const mineTest = await Mine.findOne({ mine: chat });

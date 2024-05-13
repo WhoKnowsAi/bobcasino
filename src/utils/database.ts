@@ -26,10 +26,16 @@ const MineSchema = new mongoose.Schema({
     mine: String,
 });
 
+//Define the Lottery schema
+const LotterySchema = new mongoose.Schema({
+    lotteryBonus: Number,
+});
+
 // Create models from the schemas
 export const User = mongoose.model('User', UserSchema);
 export const Command = mongoose.model('Command', CommandSchema);
 export const Mine = mongoose.model('Mine', MineSchema);
+export const Lottery = mongoose.model('Lottery', LotterySchema);
 
 // Function to add a user
 export async function addUser(username: string, points: number, blackjackBet: number, isDueling: boolean, duelInitiator: boolean, duelOpponent: string, duelBet: number, insurance: boolean, blackjackHand: string[] | null, dealerHand: string[] | null, emojiCollection: string[] | null) {
@@ -62,4 +68,9 @@ export async function addMine(mine: string) {
 // Function to delete a mine
 export async function deleteMine(mine: string) {
     return Mine.deleteOne({ mine });
+}
+
+export async function addLottery(lotteryBonus: number) {
+    const l = new Lottery({ lotteryBonus });
+    await l.save();
 }

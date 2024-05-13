@@ -4,6 +4,7 @@ zodbot is a Twitch bot built with Node.js and TypeScript. It uses the tmi.js lib
 
 ## Features
 
+- On a user's first message, they are given 10000 points to try out bot features
 - Users earn 1 point per-message sent in an available channel
 
 ### Commands
