@@ -27,6 +27,7 @@ jobs:
           CHANNELS: ${{ vars.CHANNELS}}
         run: |
           docker buildx create --use
-          docker buildx build --platform linux/amd64 -t WhoKnowsAi/bobcasino:latest .
+          docker buildx build --platform linux/amd64 -t ghcr.io/WhoKnowsAi/bobcasino:latest .
           docker login -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
-          docker push WhoKnowsAi/bobcasino:latest
+          docker login ghcr.io -u $DOCKER_USERNAME -p $DOCKER_PASSWORD
+          docker push ghcr.io/WhoKnowsAi/bobcasino:latest
