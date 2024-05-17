@@ -5,12 +5,16 @@
 // add more emojis
 // add more commands
 // update command handler to ignore already existing commands
+// change channel points reward id(s) to environment variables
+// separate command handler sections into separate files
 
 import { config } from 'dotenv';
 import * as tmi from 'tmi.js';
-import { User, Command, Mine, Lottery, addUser, addCommand, deleteCommand, editCommand, addMine, deleteMine, addLottery } from './utils/database';
+import { User, Command, Mine, Lottery, Stocks, addUser, addCommand, deleteCommand, editCommand, addMine, deleteMine, addLottery, addStock } from './utils/database';
 import { blackjack, hit, stand, doubleDown, calculateHand } from './utils/casino';
 import { Emoji } from './utils/emoji';
+import * as fs from 'fs';
+import * as path from 'path';
 
 config();
 
@@ -28,6 +32,9 @@ client.connect();
 client.on('connected', () => {
     console.log('Connected to Twitch');
     // console.log(opts.identity.username);
+    if(opts.channels) {
+        client.say(opts.channels[0], 'connected');
+    }
 });
 
 // Connect to MongoDB
@@ -41,6 +48,7 @@ async function main() {
 }
 
 // Define bot-specific variables
+// init emojis
 const emojis = [
     new Emoji('🫓', 'flatbread', 10),
     new Emoji('🗑️', 'trash', 100),
@@ -78,6 +86,42 @@ const emojis = [
     // Add more emojis here
 ];
 
+// init stocks - figure out how to only call once on bot start, has been duplicating stocks
+// Define the list of stocks
+async function initStocks() {
+    const stocks = [
+        { symbol: 'WICH', currentPrice: 150, lastPrice: 148 },
+        { symbol: 'SNAX', currentPrice: 2500, lastPrice: 2498 },
+        { symbol: 'COPES', currentPrice: 300, lastPrice: 298 },
+        { symbol: 'WKAI', currentPrice: 3500, lastPrice: 3498 },
+        { symbol: 'KLONG', currentPrice: 350, lastPrice: 348 },
+        { symbol: 'POKE', currentPrice: 4000, lastPrice: 3998 },
+        { symbol: 'ROR', currentPrice: 450, lastPrice: 448 },
+        { symbol: 'EWGF', currentPrice: 5000, lastPrice: 4998 },
+        { symbol: 'DIGI', currentPrice: 550, lastPrice: 548 },
+        { symbol: 'BOB', currentPrice: 50, lastPrice: 50 },
+        { symbol: 'ALLG', currentPrice: 100, lastPrice: 100 },
+        { symbol: 'LJF', currentPrice: 200, lastPrice: 200 },
+        { symbol: 'DORG', currentPrice: 300, lastPrice: 300}
+        // Add more stocks here
+    ];
+
+    // Add stocks to the database if they don't exist already
+    for (const stock of stocks) {
+        const existingStock = await Stocks.findOne({ symbol: stock.symbol });
+        // console.log(`findOne result for ${stock.symbol}:`, existingStock);
+        if (existingStock) {
+            console.log(`Stock already exists: ${stock.symbol}`);
+        } else {
+            console.log(`Adding stock: ${stock.symbol}`);
+            await addStock(stock.symbol, stock.currentPrice, stock.lastPrice);
+        }
+    }
+}
+
+// Call the initStocks function to initialize the stocks
+initStocks().catch(err => console.error('Error initializing stocks:', err));
+
 client.on('message', async (channel, tags, message, self) => {
     // const addcom = '!commands add';
     // const delcom = '!commands delete';
@@ -91,7 +135,7 @@ client.on('message', async (channel, tags, message, self) => {
 
     const user = await User.findOne({ username: msgUsername });
     if (!user) {
-        addUser(msgUsername.toLowerCase(), 10000, 0, false, false, '', 0, false, [], [], []) // add user with 10000 points
+        addUser(msgUsername.toLowerCase(), 10000, [], 0, false, false, '', 0, false, [], [], []) // add user with 10000 points
             .catch(err => console.error('Error adding user:', err));
     }
 
@@ -114,6 +158,7 @@ client.on('message', async (channel, tags, message, self) => {
     }
     console.log(tags.username + ': ' + chat + ' ' + tags.mod + ' ' + channelName);
 
+
     // !adduser [username]: add user - MOD ONLY
     const addUserRegex = /^!adduser (\S+)$/i;
     const addUserMatch = chat.match(addUserRegex);
@@ -124,7 +169,7 @@ client.on('message', async (channel, tags, message, self) => {
             client.say(channel, `User ${username} already exists`);
             console.log(`User ${username} already exists`);
         } else {
-            addUser(username, 10000, 0, false, false, '', 0, false, [], [], [])
+            addUser(username, 10000, [], 0, false, false, '', 0, false, [], [], [])
                 .catch(err => console.error('Error adding user:', err));
             client.say(channel, `User ${username} added`);
             console.log(`User ${username} added`);
@@ -297,7 +342,6 @@ client.on('message', async (channel, tags, message, self) => {
     }
 
     //collection section
-
     // !collection: check emoji collection
     const collectionRegex = /^!collection$/i;
     if (chat.match(collectionRegex)) {
@@ -307,7 +351,6 @@ client.on('message', async (channel, tags, message, self) => {
             client.say(channel, message);
         }
     }
-
 
     // !store: check available emojis in store
     const storeRegex = /^!(store|shop)$/i;
@@ -322,56 +365,204 @@ client.on('message', async (channel, tags, message, self) => {
         client.say(channel, message);
     }
 
-    // !buy [emoji]: buy emoji
-    const buyEmojiRegex = /^!buy (\S+)$/i;
-    const buyEmojiMatch = chat.match(buyEmojiRegex);
-    if (buyEmojiMatch) {
-        const emojiInput = buyEmojiMatch[1].toLowerCase();
-        const emoji = emojis.find(e => e.character === emojiInput || e.alias === emojiInput);
-        if (!emoji) {
-            client.say(channel, 'Invalid item');
-            return;
+    // // !buy [emoji]: buy emoji
+    // const buyEmojiRegex = /^!buy (\S+)$/i;
+    // const buyEmojiMatch = chat.match(buyEmojiRegex);
+    // if (buyEmojiMatch) {
+    //     const emojiInput = buyEmojiMatch[1].toLowerCase();
+    //     const emoji = emojis.find(e => e.character === emojiInput || e.alias === emojiInput);
+    //     if (!emoji) {
+    //         client.say(channel, 'Invalid item');
+    //         return;
+    //     }
+    //     const user = await User.findOne({ username: msgUsername });
+    //     if (!user) {
+    //         client.say(channel, 'User does not exist');
+    //         return;
+    //     }
+    //     if (user.points < emoji.price) {
+    //         client.say(channel, `You need ${emoji.price - user.points} more points to buy ${emoji.character}`);
+    //         return;
+    //     }
+    //     user.points -= emoji.price;
+    //     user.emojiCollection.push(emoji.character);
+    //     await user.save();
+    //     client.say(channel, `${msgUsername} bought an emoji: ${emoji.character}`);
+    // }
+
+    // !buy [item] [quantity]: buy item (emoji or stock)
+    const buyRegex = /^!buy (\S+)(?: (\d+))?$/i;
+    const buyMatch = chat.match(buyRegex);
+    if (buyMatch) {
+        const itemInput = buyMatch[1].toLowerCase();
+        const quantity = parseInt(buyMatch[2]) || 1; // Default to 1 if no quantity is provided
+
+        // Check if the item is an emoji
+        const emoji = emojis.find(e => e.character === itemInput || e.alias === itemInput);
+        if (emoji) {
+            // Handle buying an emoji
+            const user = await User.findOne({ username: msgUsername });
+            if (!user) {
+                client.say(channel, 'User does not exist');
+                return;
+            }
+            if (user.emojiCollection.includes(emoji.character)) {
+                client.say(channel, `You already own ${emoji.character}`);
+                return;
+            }
+            if (quantity > 1) {
+                client.say(channel, 'You cannot buy more than 1 emoji');
+                return;
+            }
+            if (user.points < emoji.price) {
+                client.say(channel, `You need ${emoji.price - user.points} more points to buy ${emoji.character}`);
+                return;
+            }
+            user.points -= emoji.price;
+            user.emojiCollection.push(emoji.character);
+            await user.save();
+            client.say(channel, `${msgUsername} bought an emoji: ${emoji.character}`);
+        } else {
+            // Assume the item is a stock symbol
+            const symbol = itemInput.toUpperCase();
+            // Handle buying a stock
+            const user = await User.findOne({ username: msgUsername });
+            const stock = await Stocks.findOne({ symbol });
+            if (!user) {
+                client.say(channel, 'User does not exist');
+                return;
+            }
+            if (!stock) {
+                client.say(channel, 'Invalid stock');
+                return;
+            }
+            if (quantity < 1 || !stock.currentPrice || quantity * stock.currentPrice > user.points) {
+                client.say(channel, 'Invalid quantity');
+                return;
+            }
+
+            // Find the owned stock in the user's ownedStocks array
+            const ownedStock = user.ownedStocks.find(stock => stock.symbol === symbol);
+
+            if (ownedStock) {
+                // If the user already owns this stock, increase the quantity
+                if (ownedStock.quantity && ownedStock.purchasePrice) {
+                    ownedStock.quantity += quantity;
+
+                    // Calculate the new purchase price by averaging the old and new purchase prices
+                    const oldPurchasePrice = ownedStock.purchasePrice;
+                    const newPurchasePrice = stock.currentPrice;
+                    const totalQuantity = ownedStock.quantity + quantity;
+                    ownedStock.purchasePrice = Math.round((oldPurchasePrice * ownedStock.quantity + newPurchasePrice * quantity) / totalQuantity);
+                }
+            } else {
+                // If the user does not own this stock, add it to the ownedStocks array
+                user.ownedStocks.push({ symbol, quantity, purchasePrice: stock.currentPrice });
+            }
+
+            // Deduct the points from the user
+            user.points -= quantity * stock.currentPrice;
+
+            // Save the updated user
+            await user.save();
+
+            // Send success message with quantity bought
+            client.say(channel, `${msgUsername} purchased ${quantity}x ${symbol} at ${stock.currentPrice}`);
         }
-        const user = await User.findOne({ username: msgUsername });
-        if (!user) {
-            client.say(channel, 'User does not exist');
-            return;
-        }
-        if (user.points < emoji.price) {
-            client.say(channel, `You need ${emoji.price - user.points} more points to buy ${emoji.character}`);
-            return;
-        }
-        user.points -= emoji.price;
-        user.emojiCollection.push(emoji.character);
-        await user.save();
-        client.say(channel, `${msgUsername} bought an emoji: ${emoji.character}`);
     }
 
-    // !sell [emoji]: sell emoji
-    const sellEmojiRegex = /^!sell (\S+)$/i;
-    const sellEmojiMatch = chat.match(sellEmojiRegex);
-    if (sellEmojiMatch) {
-        const emojiInput = sellEmojiMatch[1].toLowerCase();
-        const emoji = emojis.find(e => e.character === emojiInput || e.alias === emojiInput);
-        if (!emoji) {
-            client.say(channel, 'Invalid item');
-            return;
+    // !sell [item] [quantity]: sell item (emoji or stock)
+    const sellRegex = /^!sell (\S+)(?: (\d+))?$/i;
+    const sellMatch = chat.match(sellRegex);
+    if (sellMatch) {
+        const itemInput = sellMatch[1].toLowerCase();
+        const quantity = parseInt(sellMatch[2]) || 1;
+
+        const emoji = emojis.find(e => e.character === itemInput || e.alias === itemInput);
+        if (emoji) {
+            const user = await User.findOne({ username: msgUsername });
+            if (!user) {
+                client.say(channel, 'User does not exist');
+                return;
+            }
+            const emojiIndex = user.emojiCollection.indexOf(emoji.character);
+            if (emojiIndex === -1) {
+                client.say(channel, `You do not own ${emoji.character}`);
+                return;
+            }
+            user.points += emoji.price;
+            user.emojiCollection.splice(emojiIndex, 1);
+            await user.save();
+            client.say(channel, `${msgUsername} parted ways with ${emoji.character}`);
+        } else {
+            const symbol = itemInput.toUpperCase();
+            const user = await User.findOne({ username: msgUsername });
+            const stock = await Stocks.findOne({ symbol });
+            if (!user) {
+                client.say(channel, 'User does not exist');
+                return;
+            }
+            if (!stock) {
+                client.say(channel, 'Invalid stock');
+                return;
+            }
+            if (quantity < 1) {
+                client.say(channel, 'Invalid quantity');
+                return;
+            }
+
+            const ownedStock = user.ownedStocks.find(stock => stock.symbol === symbol);
+
+            if (ownedStock) {
+                if (ownedStock.quantity) {
+                    ownedStock.quantity -= quantity;
+                }
+                if (ownedStock.quantity === 0) {
+                    const stockIndex = user.ownedStocks.indexOf(ownedStock);
+                    user.ownedStocks.splice(stockIndex, 1);
+                }
+            }
+
+            let profit = 0;
+            if (stock.currentPrice && ownedStock && ownedStock.purchasePrice) {
+                profit = (stock.currentPrice - ownedStock.purchasePrice) * quantity;
+            }
+
+            if (stock.currentPrice) {
+                user.points += quantity * stock.currentPrice;
+            }
+
+            await user.save();
+
+            client.say(channel, `${msgUsername} sold ${quantity}x ${symbol} at ${stock.currentPrice} (Profit: ${profit})`);
         }
-        const user = await User.findOne({ username: msgUsername });
-        if (!user) {
-            client.say(channel, 'User does not exist');
-            return;
-        }
-        const emojiIndex = user.emojiCollection.indexOf(emoji.character);
-        if (emojiIndex === -1) {
-            client.say(channel, `You do not own ${emoji.character}`);
-            return;
-        }
-        user.points += emoji.price;
-        user.emojiCollection.splice(emojiIndex, 1);
-        await user.save();
-        client.say(channel, `${msgUsername} parted ways with ${emoji.character}`);
     }
+
+    // // !sell [emoji]: sell emoji
+    // const sellEmojiRegex = /^!sell (\S+)$/i;
+    // const sellEmojiMatch = chat.match(sellEmojiRegex);
+    // if (sellEmojiMatch) {
+    //     const emojiInput = sellEmojiMatch[1].toLowerCase();
+    //     const emoji = emojis.find(e => e.character === emojiInput || e.alias === emojiInput);
+    //     if (!emoji) {
+    //         client.say(channel, 'Invalid item');
+    //         return;
+    //     }
+    //     const user = await User.findOne({ username: msgUsername });
+    //     if (!user) {
+    //         client.say(channel, 'User does not exist');
+    //         return;
+    //     }
+    //     const emojiIndex = user.emojiCollection.indexOf(emoji.character);
+    //     if (emojiIndex === -1) {
+    //         client.say(channel, `You do not own ${emoji.character}`);
+    //         return;
+    //     }
+    //     user.points += emoji.price;
+    //     user.emojiCollection.splice(emojiIndex, 1);
+    //     await user.save();
+    //     client.say(channel, `${msgUsername} parted ways with ${emoji.character}`);
+    // }
 
     // //!beg: beg for points - REMOVED, REPLACING WITH PER-MESSAGE POINTS
     // const begRegex = /^!beg$/i;
@@ -385,6 +576,187 @@ client.on('message', async (channel, tags, message, self) => {
     //         await user.save();
     //     }
     // }
+
+    // // !buystock [symbol] [quantity]: buy stock - FIX, stocks are throwing "Invalid stock"
+    // const buyStockRegex = /^!buystock (\S+) (\d+)$/i;
+    // const buyStockMatch = chat.match(buyStockRegex);
+    // if (buyStockMatch) {
+    //     const symbol = buyStockMatch[1].toUpperCase();
+    //     const quantity = parseInt(buyStockMatch[2]);
+    //     const user = await User.findOne({ username: msgUsername });
+    //     const stock = await Stocks.findOne({ symbol });
+    //     if (!user) {
+    //         client.say(channel, 'User does not exist');
+    //         return;
+    //     }
+    //     if (!stock) {
+    //         client.say(channel, 'Invalid stock');
+    //         return;
+    //     }
+    //     if (quantity < 1 || !stock.currentPrice || quantity * stock.currentPrice > user.points) {
+    //         client.say(channel, 'Invalid quantity');
+    //         return;
+    //     }
+
+    //     // Find the owned stock in the user's ownedStocks array
+    //     const ownedStock = user.ownedStocks.find(stock => stock.symbol === symbol);
+
+    //     if (ownedStock) {
+    //         // If the user already owns this stock, increase the quantity
+    //         if (ownedStock.quantity) {
+    //             ownedStock.quantity += quantity;
+    //         }
+    //     } else {
+    //         // If the user does not own this stock, add it to the ownedStocks array
+    //         user.ownedStocks.push({ symbol, quantity, purchasePrice: stock.currentPrice });
+    //     }
+
+    //     // Deduct the points from the user
+    //     user.points -= quantity * stock.currentPrice;
+
+    //     // Save the updated user
+    //     await user.save();
+
+    //     // Send success message with quantity bought
+    //     client.say(channel, `${msgUsername} purchased ${quantity}x ${symbol} at ${stock.currentPrice}`);
+    // }
+
+    // // !sellstock [symbol] [quantity]: sell stock
+    // const sellStockRegex = /^!sellstock (\S+) (\d+)$/i;
+    // const sellStockMatch = chat.match(sellStockRegex);
+    // if (sellStockMatch) {
+    //     const symbol = sellStockMatch[1].toUpperCase();
+    //     const quantity = parseInt(sellStockMatch[2]);
+    //     const user = await User.findOne({ username: msgUsername });
+    //     const stock = await Stocks.findOne({ symbol });
+    //     if (!user) {
+    //         client.say(channel, 'User does not exist');
+    //         return;
+    //     }
+    //     if (!stock) {
+    //         client.say(channel, 'Invalid stock');
+    //         return;
+    //     }
+    //     if (quantity < 1) {
+    //         client.say(channel, 'Invalid quantity');
+    //         return;
+    //     }
+
+    //     // Find the owned stock in the user's ownedStocks array
+    //     const ownedStock = user.ownedStocks.find(stock => stock.symbol === symbol);
+
+    //     if (ownedStock) {
+    //         // If the user owns this stock, decrease the quantity
+    //         if (ownedStock.quantity) {
+    //             ownedStock.quantity -= quantity;
+    //         }
+    //         // If the quantity is 0, remove the stock from the ownedStocks array
+    //         if (ownedStock.quantity === 0) {
+    //             const stockIndex = user.ownedStocks.indexOf(ownedStock);
+    //             user.ownedStocks.splice(stockIndex, 1);
+    //         }
+    //     }
+
+    //     // Calculate profit
+    //     let profit = 0;
+    //     if (stock.currentPrice && ownedStock && ownedStock.purchasePrice) {
+    //         profit = (stock.currentPrice - ownedStock.purchasePrice) * quantity;
+    //     }
+
+    //     // Add the points to the user if stock.currentPrice is not null or undefined
+    //     if (stock.currentPrice) {
+    //         user.points += quantity * stock.currentPrice;
+    //     }
+
+    //     // Save the updated user
+    //     await user.save();
+
+    //     // Send success message with quantity sold and profit
+    //     client.say(channel, `${msgUsername} sold ${quantity}x ${symbol} at ${stock.currentPrice} (Profit: ${profit})`);
+    // }
+
+    // !portfolio: check user's stock portfolio
+    const portfolioRegex = /^!(portfolio|mystocks)$/i;
+    const portfolioMatch = chat.match(portfolioRegex); // declare portfolioMatch for price change prevention
+    if (portfolioMatch) {
+        const user = await User.findOne({ username: msgUsername });
+        if (user) {
+            let message = `${msgUsername}'s portfolio: `;
+            if (user.ownedStocks.length === 0) {
+                message += "Empty";
+            } else {
+                for (const stock of user.ownedStocks) {
+                    const stockInfo = await Stocks.findOne({ symbol: stock.symbol });
+                    if (stockInfo) {
+                        const percentChange = stockInfo.currentPrice && stock.purchasePrice ? ((stockInfo.currentPrice - stock.purchasePrice) / stock.purchasePrice) * 100 : 0;
+                        const changeSymbol = percentChange >= 0 ? '+' : '-';
+                        message += `${stock.quantity}x ${stock.symbol} (C: ${stockInfo.currentPrice || 0} | bAt: ${stock.purchasePrice} | ${changeSymbol}${Math.abs(percentChange).toFixed(2)}%)`;
+                    } else {
+                        message += `${stock.quantity}x ${stock.symbol}`;
+                    }
+                    message += ', ';
+                }
+                message = message.slice(0, -2); // Remove the trailing comma and space
+            }
+            client.say(channel, message);
+        }
+    }
+
+    // !stockmarket: check stock market
+    const stockMarketRegex = /^!(stockmarket|stocks)$/i;
+    const stockMarketMatch = chat.match(stockMarketRegex); // declare stockMarketMatch for price change prevention
+    if (chat.match(stockMarketRegex)) {
+        const stocks = await Stocks.find();
+        if (stocks) {
+            let message = 'AZ Index: ';
+            stocks.forEach((stock, index) => {
+                const percentChange = stock.currentPrice && stock.lastPrice ? ((stock.currentPrice - stock.lastPrice) / stock.lastPrice) * 100 : 0;
+                const changeSymbol = percentChange >= 0 ? '+' : '-';
+                message += `${stock.symbol} - (${stock.currentPrice || 0} | ${changeSymbol}${Math.abs(percentChange).toFixed(2)}%)`;
+                if (index !== stocks.length - 1) {
+                    message += ', ';
+                }
+            });
+            client.say(channel, message);
+        }
+    }
+
+    // on message, move all stock prices up or down by up to 5 points
+    const stocks = await Stocks.find();
+    if (stocks && !stockMarketMatch && !buyMatch && !sellMatch && !portfolioMatch) {
+        stocks.forEach(async stock => {
+            const random = Math.floor(Math.random() * 2) === 0 ? -1 : 1;
+            stock.lastPrice = stock.currentPrice;
+            if (stock.currentPrice) {
+                stock.currentPrice += random * Math.floor(Math.random() * 5);
+            }
+            await stock.save();
+        });
+
+        // Update ticker.txt
+        let tickerMessage = 'AZ Index: ';
+        stocks.forEach((stock, index) => {
+            const percentChange = stock.currentPrice && stock.lastPrice ? ((stock.currentPrice - stock.lastPrice) / stock.lastPrice) * 100 : 0;
+            const changeSymbol = percentChange >= 0 ? '+' : '-';
+            tickerMessage += `${stock.symbol} - (${stock.currentPrice || 0} | ${changeSymbol}${Math.abs(percentChange).toFixed(2)}%)`;
+            if (index !== stocks.length - 1) {
+                tickerMessage += ', ';
+            }
+        });
+
+        // Define the directory and file paths
+        const dirPath = path.join(__dirname, 'output');
+        const filePath = path.join(dirPath, 'ticker.txt');
+
+        // Write the message to a text file
+        fs.writeFile(filePath, tickerMessage, err => {
+            if (err) {
+                console.error('Error writing to file:', err);
+            } else {
+                console.log('Message written to file');
+            }
+        });
+    }
 
     // !gamble [points]: simple gamble points
     const gambleRegex = /^!gamble (\d+|all)$/i;
