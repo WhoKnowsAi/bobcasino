@@ -1,0 +1,17 @@
+name: Update Bob
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  curl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Run curl
+        uses: sozo-design/curl@v1.0.2
+        with:
+          args: https://olive.ahomie.lol/api/StartActionByGet/updateBob

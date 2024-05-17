@@ -3,6 +3,6 @@ services:
     build:
       context: .
     environment:
-      NODE_ENV: bobcasino
+      NODE_ENV: production
     ports:
       - 3000:3000
