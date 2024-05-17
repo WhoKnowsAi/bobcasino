@@ -10,8 +10,7 @@ ARG NODE_VERSION=20.12.2
 
 FROM node:${NODE_VERSION}-alpine
 
-# Use production node environment by default.
-ENV NODE_ENV production
+ENV TARGET_ENV=$TARGET_ENV
 
 
 WORKDIR /usr/src/app
