@@ -727,9 +727,9 @@ client.on('message', async (channel, tags, message, self) => {
         stocks.forEach(async stock => {
             const random = Math.floor(Math.random() * 2) === 0 ? -1 : 1;
             stock.lastPrice = stock.currentPrice;
-            if (stock.currentPrice) {
-                stock.currentPrice += random * Math.floor(Math.random() * 5);
-            }
+            
+            const newPrice = stock.currentPrice + random * Math.floor(Math.random() * 5);
+            stock.currentPrice = Math.max(newPrice, 0);
             await stock.save();
         });
 
