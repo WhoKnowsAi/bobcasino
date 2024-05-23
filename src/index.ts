@@ -725,6 +725,7 @@ client.on('message', async (channel, tags, message, self) => {
     const stocks = await Stocks.find();
     if (stocks && !stockMarketMatch && !buyMatch && !sellMatch && !portfolioMatch) {
         stocks.forEach(async stock => {
+            if(stock.currentPrice == null) return;
             const random = Math.floor(Math.random() * 2) === 0 ? -1 : 1;
             stock.lastPrice = stock.currentPrice;
             
